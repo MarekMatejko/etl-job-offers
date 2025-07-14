@@ -5,3 +5,5 @@ __pycache__/
 output/
 airflow/logs/
 dbt/target/
+logs/
+getting-started-todo-app/
