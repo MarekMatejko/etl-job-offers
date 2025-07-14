@@ -1,0 +1,122 @@
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: scraper_user
+      POSTGRES_PASSWORD: scraper_pass
+      POSTGRES_DB: scraper_db
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - airflow_network 
+
+  airflow_db:
+      image: postgres:15
+      restart: always
+      environment:
+        POSTGRES_USER: airflow_user
+        POSTGRES_PASSWORD: airflow_pass
+        POSTGRES_DB: airflow_db
+      volumes:
+        - airflow_pgdata:/var/lib/postgresql/data 
+      ports:
+        - "5433:5432"
+      networks:
+      - airflow_network  
+
+# psql -U scraper_user -d scraper_db coment to go db
+
+  airflow-init:
+        image: apache/airflow:2.8.0
+        restart: on-failure
+        environment:
+          - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+          - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow_user:airflow_pass@airflow_db:5432/airflow_db
+          - AIRFLOW__CORE__LOAD_EXAMPLES=False
+        entrypoint: /bin/bash -c "
+          airflow db upgrade && 
+          airflow users create --username admin --firstname Admin --lastname Admin --role Admin --email admin@example.org --password admin"
+        depends_on:
+          - airflow_db
+        networks:
+        - airflow_network  
+
+
+
+  airflow-webserver:
+    image: apache/airflow:2.8.0
+    user: root
+    restart: always
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow_user:airflow_pass@airflow_db:5432/airflow_db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW_WWW_USER_USERNAME=admin
+      - AIRFLOW_WWW_USER_PASSWORD=admin
+    command: webserver
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs 
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8080:8080"
+    depends_on:
+      - airflow_db
+    networks:
+      - airflow_network  #
+
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.0
+    user: root
+    restart: always
+    environment:
+        - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+        - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow_user:airflow_pass@airflow_db:5432/airflow_db
+        - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    command: scheduler
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs 
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - airflow_db
+    networks:
+      - airflow_network  
+
+
+  
+  scraper:
+    build:
+      context: ./scraping        
+      dockerfile: Dockerfile     
+    volumes:
+      - ./output:/app/output    
+    environment:
+      - DB_USER=scraper_user
+      - DB_PASS=scraper_pass
+      - DB_NAME=scraper_db
+      - DB_HOST=db               
+      - DB_PORT=5432
+    depends_on:
+      - db                        
+    image: scraper  
+    entrypoint: ""  
+    command: ""     
+    networks:
+      - airflow_network  
+
+
+      
+volumes:
+  pgdata:
+    driver: local
+  airflow_pgdata:
+    driver: local
+
+networks:
+  airflow_network:  
+    driver: bridge
