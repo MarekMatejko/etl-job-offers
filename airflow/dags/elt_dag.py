@@ -26,7 +26,7 @@ with DAG(
         mount_tmp_dir=False,
         auto_remove=True,  
         command="python scraping_script.py",
-        network_mode='docker_airflow_network',  
+        network_mode='airflow_network',  
         environment={
             "DB_USER": "scraper_user",
             "DB_PASS": "scraper_pass",

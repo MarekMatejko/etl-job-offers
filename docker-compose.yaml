@@ -27,7 +27,6 @@ services:
       networks:
       - airflow_network  
 
-# psql -U scraper_user -d scraper_db coment to go db
 
   airflow-init:
         image: apache/airflow:2.8.0
@@ -66,7 +65,7 @@ services:
     depends_on:
       - airflow_db
     networks:
-      - airflow_network  #
+      - airflow_network  
 
 
   airflow-scheduler:
@@ -120,3 +119,4 @@ volumes:
 networks:
   airflow_network:  
     driver: bridge
+    name: airflow_network
