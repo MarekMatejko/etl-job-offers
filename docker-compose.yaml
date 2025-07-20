@@ -1,4 +1,5 @@
 services:
+  # PostgreSQL database for the scraper (ELT data sink)
   db:
     image: postgres:15
     restart: always
@@ -13,6 +14,7 @@ services:
     networks:
       - airflow_network 
 
+  # Separate PostgreSQL instance for Airflow metadata DB
   airflow_db:
       image: postgres:15
       restart: always
@@ -27,7 +29,7 @@ services:
       networks:
       - airflow_network  
 
-
+  # One-time container to initialize the Airflow metadata DB and create admin user
   airflow-init:
         image: apache/airflow:2.8.0
         restart: on-failure
@@ -44,7 +46,7 @@ services:
         - airflow_network  
 
 
-
+  # Airflow web interface available on localhost:8080
   airflow-webserver:
     image: apache/airflow:2.8.0
     user: root
@@ -57,9 +59,9 @@ services:
       - AIRFLOW_WWW_USER_PASSWORD=admin
     command: webserver
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs 
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./airflow/dags:/opt/airflow/dags  # Mount DAGs from host
+      - ./airflow/logs:/opt/airflow/logs  # Persist Airflow logs
+      - /var/run/docker.sock:/var/run/docker.sock # Needed by DockerOperator
     ports:
       - "8080:8080"
     depends_on:
@@ -67,7 +69,7 @@ services:
     networks:
       - airflow_network  
 
-
+  # Background scheduler for executing DAG tasks
   airflow-scheduler:
     image: apache/airflow:2.8.0
     user: root
@@ -87,7 +89,7 @@ services:
       - airflow_network  
 
 
-  
+  # Scraper container built from custom Dockerfile (Python + ChromeDriver + scraping logic)
   scraper:
     build:
       context: ./scraping        
@@ -101,21 +103,20 @@ services:
       - DB_HOST=db               
       - DB_PORT=5432
     depends_on:
-      - db                        
-    image: scraper  
-    entrypoint: ""  
-    command: ""     
+      - db         # Ensure database is available first               
+    image: scraper     
     networks:
       - airflow_network  
 
 
-      
+# Define named volumes for persistent data     
 volumes:
   pgdata:
     driver: local
   airflow_pgdata:
     driver: local
 
+# Define custom Docker bridge network for Airflow components
 networks:
   airflow_network:  
     driver: bridge
